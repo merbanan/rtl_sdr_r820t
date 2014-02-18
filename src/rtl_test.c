@@ -267,6 +267,36 @@ void e4k_benchmark(void)
 		gap_start/MHZ(1), gap_end/MHZ(1));
 }
 
+void r820t_benchmark(void)
+{
+    uint32_t freq;
+    uint32_t range_start = 0, range_end = 0;
+
+    fprintf(stderr, "Benchmarking R820T PLL...\n");
+
+    /* find tuner range start */
+    for (freq = MHZ(30); freq > MHZ(1); freq -= MHZ(1)) {
+        if (rtlsdr_set_center_freq(dev, freq) < 0) {
+            range_start = freq;
+            fprintf(stderr, "range_start=%d\n",range_start);
+            break;
+        }
+    }
+
+    /* find tuner range end */
+    for (freq = MHZ(1750); freq < MHZ(1950UL); freq += MHZ(1)) {
+        if (rtlsdr_set_center_freq(dev, freq) < 0) {
+            range_end = freq;
+            break;
+        }
+    }
+
+    fprintf(stderr, "R820T range: %i to %i MHz\n",
+        range_start/MHZ(1) + 1, range_end/MHZ(1) - 1);
+}
+
+
+
 int main(int argc, char **argv)
 {
 #ifndef _WIN32
@@ -362,7 +392,9 @@ int main(int argc, char **argv)
 	if (test_mode == TUNER_BENCHMARK) {
 		if (rtlsdr_get_tuner_type(dev) == RTLSDR_TUNER_E4000)
 			e4k_benchmark();
-		else
+		else if ((rtlsdr_get_tuner_type(dev) == RTLSDR_TUNER_R820T) || (rtlsdr_get_tuner_type(dev) == RTLSDR_TUNER_R828D))
+            r820t_benchmark();
+        else
 			fprintf(stderr, "No E4000 tuner found, aborting.\n");
 
 		goto exit;

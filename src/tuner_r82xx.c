@@ -465,6 +465,9 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 		}
 		mix_div = mix_div << 1;
 	}
+	if (freq_khz > vco_min)
+        mix_div = 2;
+
 
 	rc = r82xx_read(priv, 0x00, data, sizeof(data));
 	if (rc < 0)
@@ -472,13 +475,15 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 
 	if (priv->cfg->rafael_chip == CHIP_R828D)
 		vco_power_ref = 1;
+    vco_fine_tune = data[4];
+	vco_fine_tune &= 0x30;
+	vco_fine_tune >>= 4;
 
-	vco_fine_tune = (data[4] & 0x30) >> 4;
-
+    div_num--;
 	if (vco_fine_tune > vco_power_ref)
-		div_num = div_num - 1;
+		div_num--;
 	else if (vco_fine_tune < vco_power_ref)
-		div_num = div_num + 1;
+		div_num++;
 
 	rc = r82xx_write_reg_mask(priv, 0x10, div_num << 5, 0xe0);
 	if (rc < 0)
@@ -488,10 +493,10 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	nint = vco_freq / (2 * pll_ref);
 	vco_fra = (vco_freq - 2 * pll_ref * nint) / 1000;
 
-	if (nint > ((128 / vco_power_ref) - 1)) {
-		fprintf(stderr, "[R82XX] No valid PLL values for %u Hz!\n", freq);
-		return -1;
-	}
+//	if (nint > ((128 / vco_power_ref) - 1)) {
+//		fprintf(stderr, "[R82XX] No valid PLL values for %u Hz!\n", freq);
+//		return -1;
+//	}
 
 	ni = (nint - 13) / 4;
 	si = nint - 4 * ni - 13;
@@ -520,7 +525,9 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 		}
 		n_sdm <<= 1;
 	}
-
+	
+    fprintf(stderr, "LO: %u kHz, MixDiv: %u, PLLDiv: %u, VCO %u kHz, SDM: %u \n", (uint32_t)(freq/1000), mix_div, nint,  (uint32_t)(vco_freq/1000), sdm);
+	
 	rc = r82xx_write_reg(priv, 0x16, sdm >> 8);
 	if (rc < 0)
 		return rc;
@@ -549,7 +556,7 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	if (!(data[2] & 0x40)) {
 		fprintf(stderr, "[R82XX] PLL not locked!\n");
 		priv->has_lock = 0;
-		return 0;
+		return -1;
 	}
 
 	priv->has_lock = 1;
