@@ -475,16 +475,14 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 
 	if (priv->cfg->rafael_chip == CHIP_R828D)
 		vco_power_ref = 1;
-    vco_fine_tune = data[4];
-	vco_fine_tune &= 0x30;
-	vco_fine_tune >>= 4;
 
-    div_num--;
-	if (vco_fine_tune > vco_power_ref)
-		div_num--;
-	else if (vco_fine_tune < vco_power_ref)
-		div_num++;
+    vco_fine_tune = (data[4] & 0x30) >> 4;
 
+    if (vco_fine_tune > vco_power_ref)
+        div_num = div_num - 1;
+    else if (vco_fine_tune < vco_power_ref)
+        div_num = div_num + 1;
+ 
 	rc = r82xx_write_reg_mask(priv, 0x10, div_num << 5, 0xe0);
 	if (rc < 0)
 		return rc;
